@@ -15,12 +15,18 @@ CREATE TYPE ALBUM_STATES AS ENUM(
     'Negado'
 );
 
+CREATE TYPE USER_ROLES AS ENUM(
+    'Administrator',
+    'Guest'
+);
+
 -- Tables
 CREATE TABLE USERS (
     user_id VARCHAR(36) PRIMARY KEY,
     user_name VARCHAR(100) NOT NULL,
     user_last_name VARCHAR(100) NOT NULL,
-    user_email VARCHAR(150) NOT NULL UNIQUE
+    user_email VARCHAR(150) NOT NULL UNIQUE,
+    user_role USER_ROLES NOT NULL DEFAULT 'Guest'
 );
 
 CREATE TABLE ALBUMS (
