@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    width: 100%;
+    padding: 0 2.5rem;
+    box-sizing: border-box;
+    height: 100px;
+    background: linear-gradient(135deg, #1E4D7B 0%, #2E75B6 100%);
+    color: white;
+    font-family: 'Inter', 'Roboto', system-ui, sans-serif;
+    box-shadow: 0 2px 12px rgba(30, 77, 123, 0.3);
+    border-radius: 0 0 10px 10px;
+    border-bottom: 3px solid #2E75B6;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+header > div:first-child {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    text-decoration: none;
+    color: inherit;
+}
+
+header img {
+    height: 70px;
+    width: auto;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.25));
+}
+
+header h1 {
+    font-size: clamp(2rem, 2vw, 1.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+    white-space: nowrap;
+}
+
+header h3 {
+    font-size: clamp(0.7rem, 1.2vw, 0.875rem);
+    font-weight: 400;
+    margin: 0;
+    text-align: center;
+    opacity: 0.85;
+    letter-spacing: 0.01em;
+    flex: 1;
+}
+
+header > div:last-child {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+header button {
+    font-family: 'Inter', 'Roboto', system-ui, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.45rem 1.25rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+header button:first-child {
+    background: transparent;
+    color: white;
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+}
+
+header button:first-child:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: white;
+}
+
+header button:last-child {
+    background: transparent;
+    color: white;
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 2px 6px rgba(46, 117, 182, 0.4);
+}
+
+header button:last-child:hover {
+    background: #1E4D7B;
+    border-color: #1E4D7B;
+    box-shadow: 0 4px 10px rgba(30, 77, 123, 0.4);
+}
+
+header button:active {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+@media (max-width: 768px) {
+    header {
+        flex-wrap: wrap;
+        height: auto;
+        padding: 0.75rem 1.25rem;
+        gap: 0.75rem;
+    }
+
+    header h3 {
+        display: none;
+    }
+
+    header > div:last-child {
+        gap: 0.5rem;
+    }
+
+    header button {
+        padding: 0.4rem 0.9rem;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 420px) {
+    header h1 {
+        font-size: 1rem;
+    }
+
+    header img {
+        height: 34px;
+    }
+}
