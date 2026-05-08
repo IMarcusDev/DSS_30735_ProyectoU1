@@ -1,10 +1,9 @@
 import sys
 import os
 
-file_path = 'test/test.jpeg'
-
+import src.services.exif_service as exif
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import src.services.exif_service as exif
+file_path = 'test/test.jpeg'
 
 print(exif.detect_exif(file_path))

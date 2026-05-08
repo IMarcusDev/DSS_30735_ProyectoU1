@@ -26,6 +26,7 @@ CREATE TABLE USERS (
     user_name VARCHAR(100) NOT NULL,
     user_last_name VARCHAR(100) NOT NULL,
     user_email VARCHAR(150) NOT NULL UNIQUE,
+    user_password VARCHAR(150) NOT NULL,
     user_role USER_ROLES NOT NULL DEFAULT 'Guest'
 );
 
@@ -33,7 +34,10 @@ CREATE TABLE ALBUMS (
     album_id VARCHAR(36) PRIMARY KEY,
     album_name VARCHAR(150) NOT NULL,
     album_date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    album_state ALBUM_STATES NOT NULL DEFAULT 'Pendiente'
+    album_state ALBUM_STATES NOT NULL DEFAULT 'Pendiente',
+    user_id VARCHAR(36) NOT NULL,
+
+    FOREIGN KEY (user_id) REFERENCES USERS(user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IMAGES (
