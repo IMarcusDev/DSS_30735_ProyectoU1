@@ -2,8 +2,9 @@ import uuid
 import os
 import shutil
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from pydantic import BaseModel
 
-from src.api.auth.auth import get_current_user
+from src.api.auth.auth import get_current_user, require_admin
 from src.db.connection import get_connection
 from src.models.image import Image, IMAGE_STATES
 
@@ -13,10 +14,13 @@ from src.services.histogram_service import analyze_histogram
 from src.services.lsb_service import analyze_lsb
 from src.services.mime_service import validate_mime
 
+class PatchImageRequest(BaseModel):
+  state: str | None = None
+
 
 router = APIRouter(prefix="/images", tags=["images"])
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "uploads"  # Folder to save the images
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -63,7 +67,41 @@ def check_image_suspicious(path: str) -> dict:
   }
 
 
-@router.get('/{image_id}')
+@router.get('/suspicious')
+def get_suspicious_images(user: dict = Depends(require_admin)):
+  with get_connection() as conn:
+    with conn.cursor() as cur:
+      cur.execute(
+        """
+        SELECT i.image_id, i.image_name, i.image_date_uploaded, i.image_path, i.image_mimetype, i.image_state, u.user_id, u.user_name
+        FROM IMAGES i
+        JOIN ALBUM_IMAGES ai ON i.image_id = ai.image_id
+        JOIN ALBUMS a ON ai.album_id = a.album_id
+        JOIN USERS u ON a.user_id = u.user_id
+        WHERE i.image_state = 'Sospechoso'
+        """,
+      )
+      rows = cur.fetchall()
+
+  return [
+    {
+      "image": Image(
+        id=row[0],
+        name=row[1],
+        date_uploaded=row[2],
+        path=row[3],
+        mimetype=row[4],
+        state=IMAGE_STATES(row[5]),
+      ).to_dict(),
+      "owner": {
+        "id": row[6],
+        "name": row[7]
+      }
+    }
+    for row in rows
+  ]
+
+@router.get('/id/{image_id}')
 def get_image_by_id(image_id: str, user: dict = Depends(get_current_user)):
   with get_connection() as conn:
     with conn.cursor() as cur:
@@ -176,3 +214,40 @@ def post_image(
   )
 
   return image.to_dict()
+
+
+@router.patch('/id/{image_id}')
+def patch_image(image_id: str, body: PatchImageRequest, user: dict = Depends(require_admin)):
+  if not body.state:
+    raise HTTPException(status_code=400, detail="No se enviaron campos a actualizar")
+
+  try:
+    IMAGE_STATES(body.state)  # validar que el estado es válido
+  except ValueError:
+    raise HTTPException(status_code=400, detail=f"Estado inválido: {body.state}")
+
+  with get_connection() as conn:
+    with conn.cursor() as cur:
+      cur.execute(
+        """
+        UPDATE IMAGES
+        SET image_state = %s
+        WHERE image_id = %s
+        RETURNING image_id, image_name, image_date_uploaded, image_path, image_mimetype, image_state
+        """,
+        (body.state, image_id),
+      )
+      row = cur.fetchone()
+    conn.commit()
+
+  if not row:
+    raise HTTPException(status_code=404, detail="Imagen no encontrada")
+
+  return Image(
+    id=row[0],
+    name=row[1],
+    date_uploaded=row[2],
+    path=row[3],
+    mimetype=row[4],
+    state=IMAGE_STATES(row[5]),
+  ).to_dict()
