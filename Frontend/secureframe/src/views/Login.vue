@@ -125,6 +125,25 @@ async function handleLogin() {
           <RouterLink to="/register" class="link-primary">Regístrate gratis</RouterLink>
         </p>
 
+        <!-- Demo rápido -->
+        <div class="demo-section">
+          <p class="demo-label">Acceso demo por rol</p>
+          <div class="demo-btns">
+            <RouterLink to="/galeria" class="demo-btn demo-btn--visitor">
+              <span class="demo-dot demo-dot--visitor"></span>
+              Visitante
+            </RouterLink>
+            <RouterLink to="/user/dashboard" class="demo-btn demo-btn--user">
+              <span class="demo-dot demo-dot--user"></span>
+              Usuario
+            </RouterLink>
+            <RouterLink to="/supervisor/dashboard" class="demo-btn demo-btn--supervisor">
+              <span class="demo-dot demo-dot--supervisor"></span>
+              Supervisor
+            </RouterLink>
+          </div>
+        </div>
+
       </form>
     </div>
   </div>
@@ -390,6 +409,57 @@ async function handleLogin() {
   color: #6B7280;
   margin: 0;
 }
+
+/* ── Demo section ── */
+.demo-section {
+  border-top: 1px dashed #E5E7EB;
+  padding-top: 1rem;
+}
+
+.demo-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9CA3AF;
+  text-align: center;
+  margin: 0 0 0.65rem;
+}
+
+.demo-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.demo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1.5px solid #E5E7EB;
+  background: white;
+  color: #374151;
+  transition: all 0.15s;
+}
+
+.demo-btn:hover { border-color: #9CA3AF; background: #F9FAFB; }
+
+.demo-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.demo-dot--visitor    { background: #10B981; }
+.demo-dot--user       { background: #2E75B6; }
+.demo-dot--supervisor { background: #F59E0B; }
 
 @media (max-width: 768px) {
   .auth-page {

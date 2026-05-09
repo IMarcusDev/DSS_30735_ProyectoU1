@@ -1,4 +1,6 @@
 <script setup>
+import { RouterLink } from 'vue-router'
+
 const steps = [
   {
     number: 1,
@@ -117,7 +119,10 @@ const stats = [
       </template>
     </div>
 
-    <a href="#register" class="cta-btn">Comenzar ahora — es gratis &nbsp;→</a>
+    <div class="cta-group">
+      <RouterLink to="/galeria" class="cta-btn cta-btn--primary">Explorar galería →</RouterLink>
+      <RouterLink to="/register" class="cta-btn cta-btn--outline">Crear cuenta gratis</RouterLink>
+    </div>
   </section>
 
   <section class="stats-bar">
@@ -299,6 +304,38 @@ const stats = [
 .cta-btn:active {
   transform: translateY(0);
   box-shadow: none;
+}
+
+.cta-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cta-btn--primary {
+  background: #2E75B6;
+  color: white;
+  box-shadow: 0 4px 14px rgba(46, 117, 182, 0.35);
+}
+
+.cta-btn--primary:hover {
+  background: #1E4D7B;
+  box-shadow: 0 6px 20px rgba(30, 77, 123, 0.4);
+  transform: translateY(-1px);
+}
+
+.cta-btn--outline {
+  background: transparent;
+  color: #2E75B6;
+  border: 1.5px solid #2E75B6;
+  box-shadow: none;
+}
+
+.cta-btn--outline:hover {
+  background: #EFF6FF;
+  transform: translateY(-1px);
 }
 
 .stats-bar {
