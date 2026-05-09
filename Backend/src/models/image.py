@@ -12,19 +12,18 @@ class Image:
   name: str
   date_uploaded: datetime
   path: str
-
-  # Metadata
   mimetype: str
-
   state: IMAGE_STATES
+  analysis: dict | None
 
-  def __init__(self, id: str, name: str, date_uploaded: datetime, path: str, mimetype: str, state: IMAGE_STATES) -> None:
+  def __init__(self, id: str, name: str, date_uploaded: datetime, path: str, mimetype: str, state: IMAGE_STATES, analysis: dict | None = None) -> None:
     self.id = id
     self.name = name
     self.date_uploaded = date_uploaded
     self.path = path
     self.mimetype = mimetype
     self.state = state
+    self.analysis = analysis
 
   def to_dict(self) -> dict:
     return {
@@ -34,4 +33,5 @@ class Image:
       "path": self.path,
       "mimetype": self.mimetype,
       "state": self.state.value,
+      "analysis": self.analysis,
     }

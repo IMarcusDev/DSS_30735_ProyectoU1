@@ -24,6 +24,7 @@ python-magic==0.4.27
 python-multipart==0.0.27
 PyYAML==6.0.3
 starlette==1.0.0
+slowapi==0.1.9
 stegano==2.4.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0

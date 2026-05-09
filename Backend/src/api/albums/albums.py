@@ -1,19 +1,26 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.api.auth.auth import get_current_user, require_admin
-from src.models.album import Album
+from src.models.album import Album, ALBUM_STATES
 from src.db.connection import get_connection
 
 router = APIRouter(prefix="/albums", tags=["albums"])
 
+ALLOWED_PATCH_FIELDS = {"album_name", "album_description", "album_is_public", "album_state"}
+
 class CreateAlbumRequest(BaseModel):
-  name: str
+  name: str = Field(min_length=1, max_length=150)
+  description: str = Field(default="", max_length=500)
+  is_public: bool = True
 
 class PatchAlbumRequest(BaseModel):
-  name: str | None = None
+  name: str | None = Field(default=None, min_length=1, max_length=150)
+  description: str | None = Field(default=None, max_length=500)
   state: str | None = None
+  is_public: bool | None = None
+
 
 @router.get('/id/{album_id}')
 def getAlbumById(album_id: str):
@@ -21,31 +28,36 @@ def getAlbumById(album_id: str):
     with conn.cursor() as cur:
       cur.execute(
         """
-        SELECT album_id, album_name, album_date_created, album_state
+        SELECT album_id, album_name, album_description, album_is_public, album_date_created, album_state
         FROM albums
         WHERE album_id = %s
         """,
-        (album_id),
+        (album_id,),
       )
       row = cur.fetchone()
+
+  if not row:
+    raise HTTPException(status_code=404, detail="Álbum no encontrado")
 
   return Album(
     id=row[0],
     name=row[1],
-    date_created=row[2],
-    state=row[3],
+    description=row[2],
+    is_public=row[3],
+    date_created=row[4],
+    state=ALBUM_STATES(row[5]),
   ).to_dict()
+
 
 @router.get('/')
 def getAlbumsByUserId(user: dict = Depends(get_current_user)):
   albums: list[Album] = []
-  print(user)
 
   with get_connection() as conn:
     with conn.cursor() as cur:
       cur.execute(
         """
-        SELECT album_id, album_name, album_date_created, album_state
+        SELECT album_id, album_name, album_description, album_is_public, album_date_created, album_state
         FROM albums
         WHERE user_id = %s
         """,
@@ -57,8 +69,10 @@ def getAlbumsByUserId(user: dict = Depends(get_current_user)):
         albums.append(Album(
           id=row[0],
           name=row[1],
-          date_created=row[2],
-          state=row[3],
+          description=row[2],
+          is_public=row[3],
+          date_created=row[4],
+          state=ALBUM_STATES(row[5]),
         ))
 
   return [album.to_dict() for album in albums]
@@ -67,17 +81,16 @@ def getAlbumsByUserId(user: dict = Depends(get_current_user)):
 @router.post('/')
 def postAlbum(body: CreateAlbumRequest, user: dict = Depends(get_current_user)):
   album_id = str(uuid.uuid4())
-  name = body.name
 
   with get_connection() as conn:
     with conn.cursor() as cur:
       cur.execute(
         """
-        INSERT INTO ALBUMS (album_id, album_name, user_id)
-        VALUES (%s, %s, %s)
-        RETURNING album_id, album_name, album_date_created, album_state
+        INSERT INTO ALBUMS (album_id, album_name, album_description, album_is_public, user_id)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING album_id, album_name, album_description, album_is_public, album_date_created, album_state
         """,
-        (album_id, name, user['sub']),
+        (album_id, body.name, body.description, body.is_public, user['sub']),
       )
       row = cur.fetchone()
     conn.commit()
@@ -85,9 +98,12 @@ def postAlbum(body: CreateAlbumRequest, user: dict = Depends(get_current_user)):
   return Album(
     id=row[0],
     name=row[1],
-    date_created=row[2],
-    state=row[3],
+    description=row[2],
+    is_public=row[3],
+    date_created=row[4],
+    state=ALBUM_STATES(row[5]),
   ).to_dict()
+
 
 @router.get('/pending')
 def getPendingAlbums(user: dict = Depends(require_admin)):
@@ -97,12 +113,12 @@ def getPendingAlbums(user: dict = Depends(require_admin)):
     with conn.cursor() as cur:
       cur.execute(
         """
-        SELECT a.album_id, a.album_name, a.album_date_created, a.album_state, u.user_id, u.user_name
+        SELECT a.album_id, a.album_name, a.album_description, a.album_is_public,
+               a.album_date_created, a.album_state, u.user_id, u.user_name
         FROM albums a
         JOIN users u ON a.user_id = u.user_id
         WHERE album_state = 'Pendiente'
         """,
-        (),
       )
       rows = cur.fetchall()
 
@@ -110,15 +126,16 @@ def getPendingAlbums(user: dict = Depends(require_admin)):
         album = Album(
           id=row[0],
           name=row[1],
-          date_created=row[2],
-          state=row[3],
+          description=row[2],
+          is_public=row[3],
+          date_created=row[4],
+          state=ALBUM_STATES(row[5]),
         )
-
         albums.append({
           **album.to_dict(),
           "owner": {
-            "id": row[4],
-            "name": row[5]
+            "id": row[6],
+            "name": row[7]
           }
         })
 
@@ -128,11 +145,18 @@ def getPendingAlbums(user: dict = Depends(require_admin)):
 @router.patch('/id/{album_id}')
 def patchAlbum(album_id: str, body: PatchAlbumRequest, user: dict = Depends(require_admin)):
   fields = {}
-  if body.name  is not None: fields["album_name"]  = body.name
-  if body.state is not None: fields["album_state"] = body.state
+  if body.name        is not None: fields["album_name"]        = body.name
+  if body.description is not None: fields["album_description"] = body.description
+  if body.state       is not None: fields["album_state"]       = body.state
+  if body.is_public   is not None: fields["album_is_public"]   = body.is_public
 
   if not fields:
     raise HTTPException(status_code=400, detail="No se enviaron campos a actualizar")
+
+  # Whitelist de columnas permitidas para evitar inyección
+  for col in fields:
+    if col not in ALLOWED_PATCH_FIELDS:
+      raise HTTPException(status_code=400, detail=f"Campo no permitido: {col}")
 
   set_clause = ", ".join(f"{col} = %s" for col in fields)
   values     = list(fields.values()) + [album_id]
@@ -144,7 +168,7 @@ def patchAlbum(album_id: str, body: PatchAlbumRequest, user: dict = Depends(requ
         UPDATE ALBUMS
         SET {set_clause}
         WHERE album_id = %s
-        RETURNING album_id, album_name, album_date_created, album_state
+        RETURNING album_id, album_name, album_description, album_is_public, album_date_created, album_state
         """,
         values,
       )
@@ -157,6 +181,8 @@ def patchAlbum(album_id: str, body: PatchAlbumRequest, user: dict = Depends(requ
   return Album(
     id=row[0],
     name=row[1],
-    date_created=row[2],
-    state=row[3],
+    description=row[2],
+    is_public=row[3],
+    date_created=row[4],
+    state=ALBUM_STATES(row[5]),
   ).to_dict()
