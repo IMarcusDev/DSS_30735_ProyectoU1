@@ -16,6 +16,7 @@ from src.services.exif_service import detect_exif
 from src.services.histogram_service import analyze_histogram
 from src.services.lsb_service import analyze_lsb
 from src.services.mime_service import validate_mime
+from src.services.storage_service import upload_image, delete_from_storage
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,10 @@ class PatchImageRequest(BaseModel):
 
 router = APIRouter(prefix="/images", tags=["images"])
 
-UPLOAD_DIR = "uploads"
+TEMP_DIR = "uploads_tmp"  # directorio temporal para análisis antes de subir a Supabase
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 
 def check_image_suspicious(path: str) -> dict:
@@ -209,20 +210,30 @@ def post_image(
   if not mime_result["valid"]:
     raise HTTPException(status_code=415, detail=f"Tipo de archivo no permitido: {mime_result['mime']}")
 
-  # Guardar en disco solo si pasó las validaciones
-  image_id  = str(uuid.uuid4())
-  extension = os.path.splitext(str(file.filename))[1].lower()
-  file_path = os.path.join(UPLOAD_DIR, f"{image_id}{extension}")
+  # Guardar en temp local solo para poder analizar (se elimina después de subir)
+  image_id    = str(uuid.uuid4())
+  extension   = os.path.splitext(str(file.filename))[1].lower()
+  temp_path   = os.path.join(TEMP_DIR, f"{image_id}{extension}")
+  storage_key = f"uploads/{image_id}{extension}"
 
-  with open(file_path, "wb") as buffer:
+  with open(temp_path, "wb") as buffer:
     buffer.write(content)
 
-  suspicious_dict = check_image_suspicious(file_path)
-  logger.debug("Análisis de imagen %s: %s", image_id, suspicious_dict)
+  try:
+    # Análisis esteganográfico sobre el archivo temporal local
+    suspicious_dict = check_image_suspicious(temp_path)
+    logger.debug("Análisis de imagen %s: %s", image_id, suspicious_dict)
 
-  image_state = IMAGE_STATES.SOSPECHOSO if suspicious_dict['suspicious'] else IMAGE_STATES.LIMPIO
+    image_state = IMAGE_STATES.SOSPECHOSO if suspicious_dict['suspicious'] else IMAGE_STATES.LIMPIO
 
-  # Persistir en DB incluyendo resultados del análisis
+    # Subir a Supabase Storage y obtener URL pública
+    public_url = upload_image(temp_path, storage_key, file.content_type or "image/jpeg")
+  finally:
+    # Eliminar archivo temporal independientemente del resultado
+    if os.path.exists(temp_path):
+      os.remove(temp_path)
+
+  # Persistir en DB con la URL pública de Supabase Storage
   with get_connection() as conn:
     with conn.cursor() as cur:
       cur.execute(
@@ -231,7 +242,7 @@ def post_image(
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING image_id, image_name, image_date_uploaded, image_path, image_mimetype, image_state, image_analysis
         """,
-        (image_id, file.filename, size, file_path, file.content_type, image_state.value, json.dumps(suspicious_dict)),
+        (image_id, file.filename, size, public_url, file.content_type, image_state.value, json.dumps(suspicious_dict)),
       )
       image_row = cur.fetchone()
 
@@ -267,10 +278,12 @@ def delete_image(image_id: str, user: dict = Depends(require_admin)):
   if not row:
     raise HTTPException(status_code=404, detail="Imagen no encontrada")
 
-  file_path = row[0]
-  if os.path.exists(file_path):
-    os.remove(file_path)
-    logger.debug("Archivo eliminado del disco: %s", file_path)
+  public_url = row[0]
+  try:
+    delete_from_storage(public_url)
+    logger.debug("Archivo eliminado de Supabase Storage: %s", public_url)
+  except Exception as e:
+    logger.warning("No se pudo eliminar el archivo del storage: %s", e)
 
 
 @router.patch('/id/{image_id}')

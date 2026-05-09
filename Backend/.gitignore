@@ -1,7 +1,10 @@
-venv
+venv/
 
 __pycache__/
 *.py[cod]
 
-# Test
+.env
+
+uploads_tmp/
+
 test.*
