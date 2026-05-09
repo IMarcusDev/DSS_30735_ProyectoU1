@@ -1,4 +1,10 @@
+<script setup>
+import { useRouter } from 'vue-router'
+const router = useRouter()
+</script>
+
 <style scoped src="../styles/header.css"></style>
+
 <template>
     <header>
         <div>
@@ -7,8 +13,8 @@
         </div>
         <h3>Somos una aplicación de galería para almacenar imagenes de manera segura</h3>
         <div>
-            <button type="button">Iniciar Sesión</button>
-            <button type="button">Registrarse</button>
+            <button type="button" @click="router.push('/login')">Iniciar Sesión</button>
+            <button type="button" @click="router.push('/register')">Registrarse</button>
         </div>
     </header>
 </template>

@@ -1,9 +1,16 @@
 <script setup lang="ts"></script>
 
 <template>
-  <main>
-    <RouterView />
-  </main>
+  <RouterView />
 </template>
 
-<style scoped></style>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+</style>
