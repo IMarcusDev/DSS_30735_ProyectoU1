@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AuthBrandPanel from '../components/AuthBrandPanel.vue'
+
+const router = useRouter()
 
 const email        = ref('')
 const password     = ref('')
@@ -32,11 +34,10 @@ async function handleLogin() {
   globalError.value = ''
   if (!validate()) return
   loading.value = true
-  // TODO: conectar al backend
+  // TODO: conectar al backend — por ahora redirige al dashboard demo
   await new Promise(r => setTimeout(r, 800))
   loading.value = false
-  globalError.value = 'Email o contraseña incorrectos'
-  fieldErrors.value.password = 'Contraseña incorrecta'
+  router.push('/user/dashboard')
 }
 </script>
 
