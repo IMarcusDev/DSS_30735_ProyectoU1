@@ -12,7 +12,7 @@ from src.db.connection import get_connection
 from src.models.image import Image, IMAGE_STATES
 
 from src.services.eof_service import analyze_eof
-from src.services.exif_service import detect_exif, sanitize_image
+from src.services.exif_service import detect_exif
 from src.services.histogram_service import analyze_histogram
 from src.services.lsb_service import analyze_lsb
 from src.services.mime_service import validate_mime
@@ -220,9 +220,6 @@ def post_image(
   suspicious_dict = check_image_suspicious(file_path)
   logger.debug("Análisis de imagen %s: %s", image_id, suspicious_dict)
 
-  # Sanitizar EXIF (strip de metadatos del archivo almacenado)
-  sanitize_image(file_path, file_path)
-
   image_state = IMAGE_STATES.SOSPECHOSO if suspicious_dict['suspicious'] else IMAGE_STATES.LIMPIO
 
   # Persistir en DB incluyendo resultados del análisis
@@ -253,6 +250,27 @@ def post_image(
     state=IMAGE_STATES(image_row[5]),
     analysis=image_row[6],
   ).to_dict()
+
+
+@router.delete('/id/{image_id}', status_code=204)
+def delete_image(image_id: str, user: dict = Depends(require_admin)):
+  """Supervisor rechaza y elimina definitivamente una imagen en cuarentena."""
+  with get_connection() as conn:
+    with conn.cursor() as cur:
+      cur.execute(
+        "DELETE FROM IMAGES WHERE image_id = %s RETURNING image_path",
+        (image_id,),
+      )
+      row = cur.fetchone()
+    conn.commit()
+
+  if not row:
+    raise HTTPException(status_code=404, detail="Imagen no encontrada")
+
+  file_path = row[0]
+  if os.path.exists(file_path):
+    os.remove(file_path)
+    logger.debug("Archivo eliminado del disco: %s", file_path)
 
 
 @router.patch('/id/{image_id}')
