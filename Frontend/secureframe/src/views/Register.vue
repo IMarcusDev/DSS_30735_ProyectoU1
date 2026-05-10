@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import AuthBrandPanel from '../components/AuthBrandPanel.vue'
+import { api, ApiError } from '../services/api'
 
 const name           = ref('')
 const email          = ref('')
@@ -46,6 +47,15 @@ function validate() {
   if (password.value.length < 8) {
     fieldErrors.value.password = 'Mínimo 8 caracteres'
     valid = false
+  } else if (!/[A-Z]/.test(password.value)) {
+    fieldErrors.value.password = 'Debe contener al menos una mayúscula'
+    valid = false
+  } else if (!/[0-9]/.test(password.value)) {
+    fieldErrors.value.password = 'Debe contener al menos un número'
+    valid = false
+  } else if (!/[^A-Za-z0-9]/.test(password.value)) {
+    fieldErrors.value.password = 'Debe contener al menos un símbolo (!@#$%...)'
+    valid = false
   }
   if (password.value !== confirmPwd.value) {
     fieldErrors.value.confirmPwd = 'Las contraseñas no coinciden'
@@ -58,13 +68,34 @@ function validate() {
   return valid
 }
 
+const registerError = ref('')
+
 async function handleRegister() {
   if (!validate()) return
   loading.value = true
-  // TODO: conectar al backend
-  await new Promise(r => setTimeout(r, 900))
-  loading.value = false
-  success.value = true
+  registerError.value = ''
+  try {
+    const parts = name.value.trim().split(' ')
+    await api.post('/auth/register', {
+      name:      parts[0] ?? '',
+      last_name: parts.slice(1).join(' ') || parts[0] || '',
+      email:     email.value,
+      password:  password.value,
+    })
+    success.value = true
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      fieldErrors.value.email = 'Este email ya está registrado'
+    } else if (err instanceof ApiError && err.status === 422) {
+      registerError.value = 'La contraseña no cumple los requisitos de seguridad'
+    } else if (err instanceof ApiError && err.status === 429) {
+      registerError.value = 'Demasiados registros. Espera un momento.'
+    } else {
+      registerError.value = 'Error de conexión. Intenta de nuevo.'
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -145,7 +176,7 @@ async function handleRegister() {
             Fortaleza: <strong :style="{ color: passwordStrength.color }">{{ passwordStrength.level }}</strong>
             · {{ passwordStrength.hint }}
           </p>
-          <p v-if="fieldErrors.password" class="field__error">⚠ {{ fieldErrors.password }}</p>
+          <p v-if="fieldErrors.password" class="field__error">{{ fieldErrors.password }}</p>
         </div>
 
         <div class="field" :class="{ 'field--error': fieldErrors.confirmPwd }">
@@ -170,7 +201,7 @@ async function handleRegister() {
               {{ showConfirm ? '🙈' : '👁' }}
             </button>
           </div>
-          <p v-if="fieldErrors.confirmPwd" class="field__error">⚠ {{ fieldErrors.confirmPwd }}</p>
+          <p v-if="fieldErrors.confirmPwd" class="field__error">{{ fieldErrors.confirmPwd }}</p>
         </div>
 
         <div>
@@ -181,7 +212,11 @@ async function handleRegister() {
             y la
             <a href="#" class="link-primary">política de privacidad</a>
           </label>
-          <p v-if="fieldErrors.terms" class="field__error">⚠ {{ fieldErrors.terms }}</p>
+          <p v-if="fieldErrors.terms" class="field__error">{{ fieldErrors.terms }}</p>
+        </div>
+
+        <div v-if="registerError" class="alert alert--error" role="alert">
+          <span>⚠</span> {{ registerError }}
         </div>
 
         <button type="submit" class="btn btn--primary" :disabled="loading">

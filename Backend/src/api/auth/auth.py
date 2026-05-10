@@ -106,4 +106,21 @@ def login(request: Request, body: LoginRequest):
 
 @router.get("/me")
 def me(user: dict = Depends(get_current_user)):
-  return {"user_id": user["sub"], "role": user["role"]}
+  with get_connection() as conn:
+    with conn.cursor() as cur:
+      cur.execute(
+        "SELECT user_name, user_last_name, user_email FROM USERS WHERE user_id = %s",
+        (user["sub"],),
+      )
+      row = cur.fetchone()
+
+  if not row:
+    raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+  return {
+    "user_id":   user["sub"],
+    "role":      user["role"],
+    "name":      row[0],
+    "last_name": row[1],
+    "email":     row[2],
+  }

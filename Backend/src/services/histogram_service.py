@@ -13,9 +13,7 @@ def analyze_histogram(path: str) -> dict:
 
   variance = np.var(hist_r) + np.var(hist_g) + np.var(hist_b)
 
-  suspicious = variance < 5000
-
   return {
     "variance": float(variance),
-    "suspicious": suspicious
+    "suspicious": bool(variance < 5000),
   }

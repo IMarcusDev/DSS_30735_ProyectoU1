@@ -32,13 +32,13 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
-def check_image_suspicious(path: str) -> dict:
+def check_image_suspicious(path: str, mime_result: dict | None = None) -> dict:
   results = {}
   risks = []
 
-  # MIME (structural re-check from disk)
-  with open(path, "rb") as f:
-    mime_result = validate_mime(f.read(2048))
+  if mime_result is None:
+    with open(path, "rb") as f:
+      mime_result = validate_mime(f.read(2048))
   results["mime"] = mime_result
   if not mime_result["valid"]:
     risks.append(f"MIME inválido: {mime_result['mime']}")
@@ -220,27 +220,23 @@ def post_image(
     buffer.write(content)
 
   try:
-    # Análisis esteganográfico sobre el archivo temporal local
-    suspicious_dict = check_image_suspicious(temp_path)
+    suspicious_dict = check_image_suspicious(temp_path, mime_result=mime_result)
     logger.debug("Análisis de imagen %s: %s", image_id, suspicious_dict)
 
     image_state = IMAGE_STATES.SOSPECHOSO if suspicious_dict['suspicious'] else IMAGE_STATES.LIMPIO
 
-    # Subir a Supabase Storage y obtener URL pública
     public_url = upload_image(temp_path, storage_key, file.content_type or "image/jpeg")
   finally:
-    # Eliminar archivo temporal independientemente del resultado
     if os.path.exists(temp_path):
       os.remove(temp_path)
 
-  # Persistir en DB con la URL pública de Supabase Storage
   with get_connection() as conn:
     with conn.cursor() as cur:
       cur.execute(
         """
         INSERT INTO IMAGES (image_id, image_name, image_size, image_path, image_mimetype, image_state, image_analysis)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING image_id, image_name, image_date_uploaded, image_path, image_mimetype, image_state, image_analysis
+        RETURNING image_id, image_name, image_size, image_date_uploaded, image_path, image_mimetype, image_state, image_analysis
         """,
         (image_id, file.filename, size, public_url, file.content_type, image_state.value, json.dumps(suspicious_dict)),
       )
@@ -255,11 +251,12 @@ def post_image(
   return Image(
     id=image_row[0],
     name=image_row[1],
-    date_uploaded=image_row[2],
-    path=image_row[3],
-    mimetype=image_row[4],
-    state=IMAGE_STATES(image_row[5]),
-    analysis=image_row[6],
+    size=image_row[2],
+    date_uploaded=image_row[3],
+    path=image_row[4],
+    mimetype=image_row[5],
+    state=IMAGE_STATES(image_row[6]),
+    analysis=image_row[7],
   ).to_dict()
 
 
@@ -269,10 +266,20 @@ def delete_image(image_id: str, user: dict = Depends(require_admin)):
   with get_connection() as conn:
     with conn.cursor() as cur:
       cur.execute(
-        "DELETE FROM IMAGES WHERE image_id = %s RETURNING image_path",
+        "DELETE FROM IMAGES WHERE image_id = %s RETURNING image_path, image_name",
         (image_id,),
       )
       row = cur.fetchone()
+
+      if row:
+        cur.execute(
+          """
+          INSERT INTO audit_logs (supervisor_id, action, target_type, target_id, target_name)
+          VALUES (%s, 'image_deleted', 'image', %s, %s)
+          """,
+          (user['sub'], image_id, row[1]),
+        )
+
     conn.commit()
 
   if not row:
@@ -308,6 +315,16 @@ def patch_image(image_id: str, body: PatchImageRequest, user: dict = Depends(req
         (body.state, image_id),
       )
       row = cur.fetchone()
+
+      if row and body.state == 'Limpio':
+        cur.execute(
+          """
+          INSERT INTO audit_logs (supervisor_id, action, target_type, target_id, target_name)
+          VALUES (%s, 'image_approved', 'image', %s, %s)
+          """,
+          (user['sub'], row[0], row[1]),
+        )
+
     conn.commit()
 
   if not row:

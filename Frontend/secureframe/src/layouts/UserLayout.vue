@@ -1,12 +1,40 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { useAuth } from '../composables/useAuth'
+import { albumsService } from '../services/albums'
 
 const route  = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
 
-const user = { name: 'Marcos Escobar', initials: 'ME', role: 'Usuario' }
+const { user, fetchMe, logout: authLogout } = useAuth()
+
+const counts = ref({ total: 0, approved: 0, pending: 0, rejected: 0 })
+
+onMounted(async () => {
+  await fetchMe()
+  try {
+    const albums = await albumsService.getMine()
+    counts.value = {
+      total:    albums.length,
+      approved: albums.filter(a => a.state === 'Aprobado').length,
+      pending:  albums.filter(a => a.state === 'Pendiente').length,
+      rejected: albums.filter(a => a.state === 'Negado').length,
+    }
+  } catch {}
+})
+
+const displayName     = computed(() => user.value?.name ?? 'Mi cuenta')
+const displayRole     = computed(() => { const r = user.value?.role; return (!r || r === 'Administrator') ? 'Usuario' : r })
+const displayInitials = computed(() => {
+  if (user.value?.name) {
+    const f = user.value.name[0] ?? ''
+    const l = user.value.last_name?.[0] ?? ''
+    return (f + l).toUpperCase()
+  }
+  return 'GU'
+})
 
 const icons = {
   home:    'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
@@ -22,21 +50,17 @@ const icons = {
   menu:    'M4 6h16M4 12h16M4 18h16',
 }
 
-const navGroups = [
+const navGroups = computed(() => [
   {
     label: 'MIS ÁLBUMES',
     items: [
-      { label: 'Todos',       to: '/user/albums',                              icon: 'folder', badge: 3 },
-      { label: 'Aprobados',   to: '/user/albums?status=approved',              icon: 'check',  badge: 2 },
-      { label: 'Pendientes',  to: '/user/albums?status=pending',               icon: 'clock',  badge: 1 },
-      { label: 'Rechazados',  to: '/user/albums?status=rejected',              icon: 'xcirc', badge: null },
+      { label: 'Todos',       to: '/user/albums',                 icon: 'folder', badge: counts.value.total    || null },
     ],
   },
   {
     label: 'MIS IMÁGENES',
     items: [
-      { label: 'Subir imagen',    to: '/user/upload',     icon: 'upload', badge: null },
-      { label: 'En cuarentena',   to: '/user/quarantine', icon: 'shield', badge: 2 },
+      { label: 'Subir imagen', to: '/user/upload', icon: 'upload', badge: null },
     ],
   },
   {
@@ -45,17 +69,18 @@ const navGroups = [
       { label: 'Mi perfil', to: '/user/profile', icon: 'user', badge: null },
     ],
   },
-]
+])
 
 const pageTitle = computed(() => {
-  const name = route.name
   const map = {
     UserDashboard:   'Dashboard',
     MisAlbumes:      'Mis Álbumes',
     SolicitarAlbum:  'Solicitar Álbum',
-    AlbumDetalle:    'Detalle del Álbum',
+    VerAlbum:        'Ver Álbum',
+    SubirImagen:     'Subir Imagen',
+    MiPerfil:        'Mi Perfil',
   }
-  return map[name] || 'Panel de Usuario'
+  return map[route.name] || 'Panel de Usuario'
 })
 
 function isActive(to) {
@@ -64,6 +89,7 @@ function isActive(to) {
 }
 
 function logout() {
+  authLogout()
   router.push('/login')
 }
 </script>
@@ -134,10 +160,10 @@ function logout() {
           </button>
 
           <div class="user-chip">
-            <div class="user-avatar">{{ user.initials }}</div>
+            <div class="user-avatar">{{ displayInitials }}</div>
             <div class="user-info">
-              <span class="user-name">{{ user.name }}</span>
-              <span class="user-role">{{ user.role }}</span>
+              <span class="user-name">{{ displayName }}</span>
+              <span class="user-role">{{ displayRole }}</span>
             </div>
           </div>
         </div>

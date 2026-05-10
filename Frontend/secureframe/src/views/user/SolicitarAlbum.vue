@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { albumsService } from '../../services/albums'
+import { ApiError } from '../../services/api'
 
 const router = useRouter()
 
@@ -8,41 +10,40 @@ const title       = ref('')
 const description = ref('')
 const privacy     = ref('publico')
 const loading     = ref(false)
+const submitError = ref('')
 const errors      = ref({ title: '', description: '' })
 
 const titleLen = computed(() => title.value.length)
 const descLen  = computed(() => description.value.length)
-
 const titleProgress = computed(() => Math.min((titleLen.value / 100) * 100, 100))
 const descProgress  = computed(() => Math.min((descLen.value / 500) * 100, 100))
 
 function validate() {
   errors.value = { title: '', description: '' }
   let valid = true
-  if (!title.value.trim()) {
-    errors.value.title = 'El título es requerido'
-    valid = false
-  } else if (titleLen.value > 100) {
-    errors.value.title = 'Máximo 100 caracteres'
-    valid = false
-  }
-  if (!description.value.trim()) {
-    errors.value.description = 'La descripción es requerida'
-    valid = false
-  } else if (descLen.value > 500) {
-    errors.value.description = 'Máximo 500 caracteres'
-    valid = false
-  }
+  if (!title.value.trim()) { errors.value.title = 'El título es requerido'; valid = false }
+  else if (titleLen.value > 100) { errors.value.title = 'Máximo 100 caracteres'; valid = false }
+  if (!description.value.trim()) { errors.value.description = 'La descripción es requerida'; valid = false }
+  else if (descLen.value > 500) { errors.value.description = 'Máximo 500 caracteres'; valid = false }
   return valid
 }
 
 async function handleSubmit() {
   if (!validate()) return
   loading.value = true
-  // TODO: conectar al backend (POST /albums/request)
-  await new Promise(r => setTimeout(r, 900))
-  loading.value = false
-  router.push({ path: '/user/albums', query: { toast: 'created' } })
+  submitError.value = ''
+  try {
+    await albumsService.create({
+      name:      title.value.trim(),
+      description: description.value.trim(),
+      is_public: privacy.value === 'publico',
+    })
+    router.push('/user/albums')
+  } catch (err) {
+    submitError.value = err instanceof ApiError ? err.message : 'Error al enviar la solicitud.'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

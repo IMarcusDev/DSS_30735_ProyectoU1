@@ -1,6 +1,3 @@
--- Migration v2: run this if ya tienes la base de datos inicializada con init.sql original
--- Safe to run multiple times (IF NOT EXISTS / IF EXISTS guards)
-
 ALTER TABLE USERS
   ALTER COLUMN user_password TYPE VARCHAR(255);
 

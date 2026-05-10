@@ -1,55 +1,88 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { imagesService, getAnalysisReasons, type SuspiciousImage } from '../../services/images'
+import { ApiError } from '../../services/api'
 
 type RiskLevel = 'high' | 'medium'
-
-interface Gradient { from: string; to: string }
-
-const gradients: Gradient[] = [
-  { from: '#667eea', to: '#764ba2' }, { from: '#4facfe', to: '#00f2fe' },
-  { from: '#fa709a', to: '#fee140' }, { from: '#43e97b', to: '#38f9d7' },
-  { from: '#30cfd0', to: '#330867' },
-]
 
 interface QuarantineImage {
   id: string; filename: string; album: string
   uploader: string; uploaderI: string; date: string
-  risk: RiskLevel; reasons: string[]; gradient: Gradient
+  imagePath: string
+  risk: RiskLevel; reasons: string[]
 }
 
-const images = ref<QuarantineImage[]>([
-  { id: 'QRT-001', filename: 'foto_012.jpg',        album: 'Proyecto ESPE 2025',           uploader: 'Marcos Escobar',  uploaderI: 'ME', date: '07/05 14:23', risk: 'high',   reasons: ['Anomalía LSB detectada', 'Marcador EOF sospechoso'], gradient: gradients[0]! },
-  { id: 'QRT-002', filename: 'arquitectura_05.jpg', album: 'Arquitectura Histórica Quito', uploader: 'Marcos Escobar',  uploaderI: 'ME', date: '08/05 09:11', risk: 'medium', reasons: ['Histograma de color anómalo'],                         gradient: gradients[1]! },
-  { id: 'QRT-003', filename: 'paisaje_001.jpg',     album: 'Paisajes de los Andes',        uploader: 'Jorge Morales',   uploaderI: 'JM', date: '08/05 10:44', risk: 'high',   reasons: ['Anomalía LSB detectada', 'Ruido estadístico alto'],  gradient: gradients[2]! },
-  { id: 'QRT-004', filename: 'mercado_07.jpg',      album: 'Mercado Artesanal Otavalo',    uploader: 'Lucía Paz',       uploaderI: 'LP', date: '08/05 11:02', risk: 'medium', reasons: ['Metadatos EXIF sospechosos'],                         gradient: gradients[3]! },
-  { id: 'QRT-005', filename: 'campus_03.jpg',       album: 'ESPE Campus Universitario',   uploader: 'Marcos Escobar',  uploaderI: 'ME', date: '08/05 12:30', risk: 'high',   reasons: ['Marcador EOF attack', 'Payload oculto potencial'],   gradient: gradients[4]! },
-])
+function initials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
 
+function toRisk(state: string): RiskLevel {
+  return state === 'Positivo' ? 'high' : 'medium'
+}
+
+function mapImage(item: SuspiciousImage): QuarantineImage {
+  const reasons = getAnalysisReasons(item.image.image_analysis)
+  return {
+    id:         item.image.image_id,
+    filename:   item.image.image_name,
+    album:      '',
+    uploader:   item.owner.name,
+    uploaderI:  initials(item.owner.name),
+    date:       new Date(item.image.image_date_uploaded).toLocaleString('es-EC'),
+    imagePath:  item.image.image_path,
+    risk:       toRisk(item.image.image_state),
+    reasons,
+  }
+}
+
+const images  = ref<QuarantineImage[]>([])
+const loading = ref(true)
 const activeFilter = ref('all')
 const searchQuery  = ref('')
 
-const riskMap = {
+const riskMap: Record<RiskLevel, { label: string; color: string; bg: string }> = {
   high:   { label: 'Alto',  color: '#EF4444', bg: '#FEF2F2' },
   medium: { label: 'Medio', color: '#F59E0B', bg: '#FFFBEB' },
 }
+
+onMounted(async () => {
+  try {
+    const data = await imagesService.getSuspicious()
+    images.value = data.map(mapImage)
+  } catch {
+    images.value = []
+  } finally {
+    loading.value = false
+  }
+})
 
 const filteredImages = computed(() => {
   let list = images.value
   if (activeFilter.value !== 'all') list = list.filter(i => i.risk === activeFilter.value)
   const q = searchQuery.value.toLowerCase().trim()
-  if (q) list = list.filter(i => i.filename.toLowerCase().includes(q) || i.album.toLowerCase().includes(q) || i.uploader.toLowerCase().includes(q))
+  if (q) list = list.filter(i => i.filename.toLowerCase().includes(q) || i.uploader.toLowerCase().includes(q))
   return list
 })
 
 const highCount   = computed(() => images.value.filter(i => i.risk === 'high').length)
 const mediumCount = computed(() => images.value.filter(i => i.risk === 'medium').length)
 
-function approve(id: string) {
-  images.value = images.value.filter(i => i.id !== id)
+async function approve(id: string) {
+  try {
+    await imagesService.updateState(id, 'Limpio')
+    images.value = images.value.filter(i => i.id !== id)
+  } catch (err) {
+    alert(err instanceof ApiError ? err.message : 'Error al aprobar')
+  }
 }
 
-function reject(id: string) {
-  images.value = images.value.filter(i => i.id !== id)
+async function reject(id: string) {
+  try {
+    await imagesService.delete(id)
+    images.value = images.value.filter(i => i.id !== id)
+  } catch (err) {
+    alert(err instanceof ApiError ? err.message : 'Error al eliminar')
+  }
 }
 </script>
 
@@ -100,16 +133,12 @@ function reject(id: string) {
     <div v-if="filteredImages.length > 0" class="image-grid">
       <div v-for="img in filteredImages" :key="img.id" class="image-card">
 
-        <div class="image-thumb" :style="{ background: `linear-gradient(135deg, ${img.gradient.from}, ${img.gradient.to})` }">
+        <div class="image-thumb">
+          <img :src="img.imagePath" :alt="img.filename" class="thumb-img" loading="lazy" />
           <div class="risk-overlay" :style="{ background: riskMap[img.risk].bg, color: riskMap[img.risk].color }">
             <span class="risk-dot" :style="{ background: riskMap[img.risk].color }"></span>
             Riesgo {{ riskMap[img.risk].label }}
           </div>
-          <svg class="photo-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="3"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <path d="M21 15l-5-5L5 21"/>
-          </svg>
           <div class="scan-lines"></div>
         </div>
 
@@ -268,10 +297,15 @@ function reject(id: string) {
 .image-thumb {
   position: relative;
   height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
+  background: #E5E7EB;
+}
+
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .photo-icon {

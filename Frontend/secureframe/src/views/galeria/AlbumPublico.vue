@@ -1,48 +1,15 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import Header from '../../components/header.vue'
+import { albumsService } from '../../services/albums'
+import { imagesService } from '../../services/images'
 
-const route = useRoute()
-
-const allAlbums = {
-  'ALB-002': {
-    id: 'ALB-002', title: 'Arquitectura Histórica Quito',
-    description: 'Registro fotográfico del centro histórico de la ciudad de Quito, Ecuador. Un paseo visual por iglesias, plazas y calles coloniales del casco histórico declarado Patrimonio de la Humanidad.',
-    imageCount: 8, authorInitials: 'ME', authorName: 'Marcos Escobar', date: '03/05/2026',
-    palette: ['#3B82F6', '#2563EB', '#60A5FA', '#BFDBFE'],
-  },
-  'ALB-005': {
-    id: 'ALB-005', title: 'Naturaleza en Cotacachi',
-    description: 'Fotografías de la naturaleza del volcán Cotacachi y sus alrededores. Laguna de Cuicocha, flora andina y cielos despejados del norte de Ecuador.',
-    imageCount: 12, authorInitials: 'AV', authorName: 'Ana Vázquez', date: '05/05/2026',
-    palette: ['#10B981', '#059669', '#34D399', '#A7F3D0'],
-  },
-  'ALB-006': {
-    id: 'ALB-006', title: 'Ciudad de Guayaquil',
-    description: 'Vistas urbanas del puerto principal de Ecuador al atardecer y al amanecer. El Malecón 2000, el barrio Las Peñas y la modernidad del Puerto Santa Ana.',
-    imageCount: 15, authorInitials: 'CR', authorName: 'Carlos Reyes', date: '06/05/2026',
-    palette: ['#F59E0B', '#D97706', '#FCD34D', '#FEF3C7'],
-  },
-  'ALB-007': {
-    id: 'ALB-007', title: 'Mercado Artesanal Otavalo',
-    description: 'Colores, texturas y cultura del mercado indígena más grande de Sudamérica. Artesanías, tejidos, tapices y la riqueza cultural del pueblo Kichwa.',
-    imageCount: 10, authorInitials: 'LP', authorName: 'Lucía Paz', date: '07/05/2026',
-    palette: ['#8B5CF6', '#7C3AED', '#C4B5FD', '#EDE9FE'],
-  },
-  'ALB-008': {
-    id: 'ALB-008', title: 'Paisajes de los Andes',
-    description: 'La majestuosidad de la cordillera andina ecuatoriana captada en distintas épocas. Nevados, valles interandinos y la diversidad paisajística de Ecuador.',
-    imageCount: 20, authorInitials: 'JM', authorName: 'Jorge Morales', date: '08/05/2026',
-    palette: ['#EF4444', '#DC2626', '#FCA5A5', '#FEE2E2'],
-  },
-  'ALB-009': {
-    id: 'ALB-009', title: 'ESPE Campus Universitario',
-    description: 'La vida universitaria y la infraestructura del campus de la ESPE. Laboratorios, áreas verdes y la dinámica cotidiana de la comunidad universitaria.',
-    imageCount: 6, authorInitials: 'ME', authorName: 'Marcos Escobar', date: '01/05/2026',
-    palette: ['#0EA5E9', '#0284C7', '#38BDF8', '#BAE6FD'],
-  },
-}
+const route   = useRoute()
+const album   = ref(null)
+const images  = ref([])
+const loading = ref(true)
+const error   = ref('')
 
 const gradients = [
   { from: '#667eea', to: '#764ba2' }, { from: '#f093fb', to: '#f5576c' },
@@ -51,36 +18,53 @@ const gradients = [
   { from: '#fccb90', to: '#d57eeb' }, { from: '#0fd850', to: '#f9f047' },
   { from: '#30cfd0', to: '#330867' }, { from: '#a1c4fd', to: '#c2e9fb' },
   { from: '#fd7043', to: '#ff8a65' }, { from: '#26a0da', to: '#314755' },
-  { from: '#e0c3fc', to: '#8ec5fc' }, { from: '#f6d365', to: '#fda085' },
-  { from: '#84fab0', to: '#8fd3f4' }, { from: '#d4fc79', to: '#96e6a1' },
-  { from: '#ffecd2', to: '#fcb69f' }, { from: '#ff9a9e', to: '#fecfef' },
-  { from: '#a18cd1', to: '#fbc2eb' }, { from: '#fddb92', to: '#d1fdff' },
 ]
 
-const album = computed(() => allAlbums[route.params.id] || null)
+const albumPalette = ['#3B82F6','#2563EB','#60A5FA','#BFDBFE']
 
-const images = computed(() => {
-  if (!album.value) return []
-  return Array.from({ length: album.value.imageCount }, (_, i) => ({
-    id: i + 1,
-    filename: `foto_${String(i + 1).padStart(3, '0')}.jpg`,
-    gradient: gradients[i % gradients.length],
-  }))
+function initials(name) {
+  return (name ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function formatDate(iso) {
+  return iso ? new Date(iso).toLocaleDateString('es-EC', { day:'2-digit', month:'short', year:'numeric' }) : ''
+}
+
+onMounted(async () => {
+  const id = route.params.id
+  try {
+    const [albumData, imgData] = await Promise.all([
+      albumsService.getById(id),
+      imagesService.getByAlbum(id),
+    ])
+    album.value  = albumData
+    images.value = imgData
+  } catch {
+    error.value = 'No se pudo cargar el álbum.'
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 
 <template>
   <div class="album-page">
     <Header />
-    <div v-if="!album" class="not-found">
+
+    <div v-if="loading" class="loading-state">
+      <div class="spinner-large"></div>
+      <p>Cargando álbum...</p>
+    </div>
+
+    <div v-else-if="error || !album" class="not-found">
       <p class="nf-icon">📂</p>
       <h2>Álbum no encontrado</h2>
-      <p>Este álbum no existe o no está disponible públicamente.</p>
+      <p>{{ error || 'Este álbum no existe o no está disponible públicamente.' }}</p>
       <RouterLink to="/galeria" class="back-btn">← Volver a la galería</RouterLink>
     </div>
 
     <template v-else>
-      <section class="album-banner" :style="{ background: `linear-gradient(135deg, ${album.palette[0]}, ${album.palette[1]})` }">
+      <section class="album-banner" :style="{ background: `linear-gradient(135deg, ${albumPalette[0]}, ${albumPalette[1]})` }">
         <div class="album-banner__inner">
           <RouterLink to="/galeria" class="back-link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -91,21 +75,21 @@ const images = computed(() => {
 
           <div class="album-banner__body">
             <div class="banner-cover">
-              <div v-for="(c, i) in album.palette" :key="i" class="banner-swatch" :style="{ background: c, opacity: 0.4 + i * 0.15 }"></div>
+              <div v-for="(c, i) in albumPalette" :key="i" class="banner-swatch" :style="{ background: c, opacity: 0.4 + i * 0.15 }"></div>
             </div>
 
             <div class="album-banner__text">
-              <h1 class="album-title">{{ album.title }}</h1>
+              <h1 class="album-title">{{ album.name }}</h1>
               <p class="album-desc">{{ album.description }}</p>
               <div class="album-meta">
                 <div class="author-chip">
-                  <div class="author-avatar">{{ album.authorInitials }}</div>
-                  <span>{{ album.authorName }}</span>
+                  <div class="author-avatar">{{ initials(album.author_name) }}</div>
+                  <span>{{ album.author_name ?? 'Usuario' }}</span>
                 </div>
                 <span class="meta-sep">·</span>
-                <span>{{ album.imageCount }} imágenes</span>
+                <span>{{ images.length }} imágenes</span>
                 <span class="meta-sep">·</span>
-                <span>{{ album.date }}</span>
+                <span>{{ formatDate(album.date_created) }}</span>
               </div>
             </div>
           </div>
@@ -118,27 +102,27 @@ const images = computed(() => {
       </section>
 
       <section class="images-section">
-        <div class="images-grid">
-          <div v-for="img in images" :key="img.id" class="image-card">
-            <div
-              class="image-thumb"
-              :style="{ background: `linear-gradient(135deg, ${img.gradient.from}, ${img.gradient.to})` }"
-            >
-              <svg class="photo-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="3"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <path d="M21 15l-5-5L5 21"/>
-              </svg>
-
+        <div v-if="images.length === 0" class="empty-images">
+          <p>Este álbum aún no tiene imágenes.</p>
+        </div>
+        <div v-else class="images-grid">
+          <div v-for="(img, idx) in images" :key="img.image_id" class="image-card">
+            <div class="image-thumb">
+              <img
+                :src="img.image_path"
+                :alt="img.image_name"
+                class="real-image"
+                loading="lazy"
+                :style="{ background: `linear-gradient(135deg, ${gradients[idx % gradients.length].from}, ${gradients[idx % gradients.length].to})` }"
+              />
               <div class="image-overlay">
                 <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round">
                   <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
                 </svg>
               </div>
             </div>
-
             <div class="image-footer">
-              <span class="image-name">{{ img.filename }}</span>
+              <span class="image-name">{{ img.image_name }}</span>
               <span class="verified-tag">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="10" height="10">
                   <path d="M20 6L9 17l-5-5"/>
@@ -181,6 +165,40 @@ const images = computed(() => {
   min-height: 100vh;
   background: #F9FAFB;
   font-family: 'Inter', system-ui, sans-serif;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 6rem 2rem;
+  color: #9CA3AF;
+  font-size: 0.9rem;
+}
+
+.spinner-large {
+  width: 40px; height: 40px;
+  border: 3px solid #E5E7EB;
+  border-top-color: #2E75B6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.real-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.empty-images {
+  text-align: center;
+  padding: 3rem;
+  color: #9CA3AF;
+  font-size: 0.9rem;
 }
 
 .not-found {

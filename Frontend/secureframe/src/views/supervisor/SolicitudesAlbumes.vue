@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { albumsService, type PendingAlbum } from '../../services/albums'
+import { ApiError } from '../../services/api'
+import { timeAgo, hoursAgo } from '../../utils/time'
 
 type Priority = 'urgent' | 'media' | 'normal'
 
@@ -16,16 +19,49 @@ const priorityMap: Record<Priority, { label: string; color: string }> = {
   normal: { label: 'Normal',  color: '#9CA3AF' },
 }
 
-const requests = ref<RequestItem[]>([
-  { id: 'REQ-045', title: 'Paisajes de los Andes',        description: 'Fotografías de la cordillera andina ecuatoriana. Nevados, valles y paisajes de altura.', userInitials: 'JM', userName: 'Jorge Morales',  userEmail: 'j.morales@email.com', privacy: 'Público', date: '08/05/2026 10:30', time: 'hace 2d',  priority: 'urgent', selected: false },
-  { id: 'REQ-044', title: 'Naturaleza en Cotacachi',      description: 'Laguna de Cuicocha, flora andina y cielos despejados del norte de Ecuador.',              userInitials: 'AV', userName: 'Ana Vázquez',   userEmail: 'a.vazquez@email.com', privacy: 'Privado', date: '08/05/2026 09:15', time: 'hace 1d',  priority: 'urgent', selected: false },
-  { id: 'REQ-043', title: 'Ciudad de Guayaquil',          description: 'Vistas del Malecón 2000 y el barrio Las Peñas al atardecer.',                             userInitials: 'CR', userName: 'Carlos Reyes',  userEmail: 'c.reyes@email.com',   privacy: 'Público', date: '08/05/2026 16:20', time: 'hace 18h', priority: 'media',  selected: false },
-  { id: 'REQ-042', title: 'Mercado Artesanal Otavalo',    description: 'Colores, texturas y cultura del mercado indígena más grande de Sudamérica.',              userInitials: 'LP', userName: 'Lucía Paz',     userEmail: 'l.paz@email.com',     privacy: 'Público', date: '08/05/2026 08:00', time: 'hace 14h', priority: 'media',  selected: false },
-  { id: 'REQ-041', title: 'ESPE Campus Universitario',   description: 'Vida universitaria e infraestructura del campus de la Universidad ESPE.',                  userInitials: 'ME', userName: 'Marcos Escobar',userEmail: 'm.escobar@email.com', privacy: 'Privado', date: '08/05/2026 11:45', time: 'hace 8h',  priority: 'normal', selected: false },
-])
+function initials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function toPriority(iso: string): Priority {
+  const h = hoursAgo(iso)
+  if (h > 48) return 'urgent'
+  if (h > 24) return 'media'
+  return 'normal'
+}
+
+function mapAlbum(a: PendingAlbum): RequestItem {
+  return {
+    id:           a.id,
+    title:        a.name,
+    description:  a.description,
+    userInitials: initials(a.owner.name),
+    userName:     a.owner.name,
+    userEmail:    '',
+    privacy:      a.is_public ? 'Público' : 'Privado',
+    date:         new Date(a.date_created + (a.date_created.endsWith('Z') ? '' : 'Z')).toLocaleString('es-EC'),
+    time:         timeAgo(a.date_created),
+    priority:     toPriority(a.date_created),
+    selected:     false,
+  }
+}
+
+const requests = ref<RequestItem[]>([])
 
 const searchQuery = ref('')
-const selected = ref<RequestItem | null>(null)
+const selected    = ref<RequestItem | null>(null)
+const loading     = ref(true)
+
+onMounted(async () => {
+  try {
+    const data = await albumsService.getPending()
+    requests.value = data.map(mapAlbum)
+  } catch {
+    requests.value = []
+  } finally {
+    loading.value = false
+  }
+})
 
 const filteredRequests = computed(() => {
   const q = searchQuery.value.toLowerCase().trim()
@@ -49,14 +85,24 @@ function selectRow(req: RequestItem) {
   selected.value = selected.value?.id === req.id ? null : req
 }
 
-function approve(id: string) {
-  requests.value = requests.value.filter(r => r.id !== id)
-  if (selected.value?.id === id) selected.value = null
+async function approve(id: string) {
+  try {
+    await albumsService.approve(id)
+    requests.value = requests.value.filter(r => r.id !== id)
+    if (selected.value?.id === id) selected.value = null
+  } catch (err) {
+    alert(err instanceof ApiError ? err.message : 'Error al aprobar')
+  }
 }
 
-function reject(id: string) {
-  requests.value = requests.value.filter(r => r.id !== id)
-  if (selected.value?.id === id) selected.value = null
+async function reject(id: string) {
+  try {
+    await albumsService.reject(id)
+    requests.value = requests.value.filter(r => r.id !== id)
+    if (selected.value?.id === id) selected.value = null
+  } catch (err) {
+    alert(err instanceof ApiError ? err.message : 'Error al rechazar')
+  }
 }
 
 function clearSelection() {
@@ -71,31 +117,27 @@ function clearSelection() {
         <div class="workflow-tag">WORKFLOW</div>
         <h2 class="page-title">Solicitudes de Álbumes Pendientes</h2>
       </div>
-      <div class="refresh-tag">
-        <span class="refresh-dot"></span>
-        Auto-refresh: 30s · Última: hace 12s
-      </div>
     </div>
     <div class="mini-kpis">
       <div class="mini-kpi">
         <p class="mk-label">PENDIENTES</p>
         <p class="mk-value mk-value--warn">{{ requests.length }}</p>
-        <p class="mk-delta">+1 hoy</p>
+        <p class="mk-delta">en cola</p>
       </div>
       <div class="mini-kpi">
         <p class="mk-label">URGENTES</p>
         <p class="mk-value mk-value--danger">{{ requests.filter(r => r.priority === 'urgent').length }}</p>
-        <p class="mk-delta">requieren acción</p>
+        <p class="mk-delta">más de 48h en cola</p>
       </div>
       <div class="mini-kpi">
-        <p class="mk-label">TIEMPO PROM.</p>
-        <p class="mk-value">4h</p>
-        <p class="mk-delta">meta: 24h</p>
+        <p class="mk-label">PRIORIDAD MEDIA</p>
+        <p class="mk-value mk-value--warn">{{ requests.filter(r => r.priority === 'media').length }}</p>
+        <p class="mk-delta">24 – 48h en cola</p>
       </div>
       <div class="mini-kpi">
-        <p class="mk-label">APROBADAS HOY</p>
-        <p class="mk-value mk-value--ok">2</p>
-        <p class="mk-delta">vs 1 ayer</p>
+        <p class="mk-label">NORMALES</p>
+        <p class="mk-value">{{ requests.filter(r => r.priority === 'normal').length }}</p>
+        <p class="mk-delta">menos de 24h</p>
       </div>
     </div>
 

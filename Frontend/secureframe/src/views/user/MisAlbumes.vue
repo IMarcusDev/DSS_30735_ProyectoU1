@@ -1,14 +1,15 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { albumsService } from '../../services/albums'
 
-const router = useRouter()
+const albums      = ref([])
+const loading     = ref(true)
+const activeTab   = ref('all')
+const searchQuery = ref('')
+const selected    = ref(null)
 
-const albums = ref([
-  { id: 'ALB-001', title: 'Proyecto ESPE 2025',            description: 'Imágenes del proyecto integrador de Software Seguro en ESPE.',             privacy: 'Privado', images: 12, quarantined: 1, status: 'approved', date: '01/05/2026' },
-  { id: 'ALB-002', title: 'Arquitectura Histórica Quito',  description: 'Registro fotográfico del centro histórico de la ciudad de Quito, Ecuador.', privacy: 'Público', images: 8,  quarantined: 1, status: 'approved', date: '03/05/2026' },
-  { id: 'ALB-003', title: 'Laboratorio DSS 2026',          description: 'Documentación fotográfica del laboratorio de Desarrollo de Software Seguro.',privacy: 'Privado', images: 0,  quarantined: 0, status: 'pending',  date: '07/05/2026' },
-])
+const stateToKey = { 'Aprobado': 'approved', 'Pendiente': 'pending', 'Negado': 'rejected' }
 
 const statusMap = {
   approved: { label: 'Aprobado',  color: '#10B981', bg: '#ECFDF5' },
@@ -23,9 +24,25 @@ const tabs = [
   { key: 'rejected', label: 'Rechazados' },
 ]
 
-const activeTab   = ref('all')
-const searchQuery = ref('')
-const selected    = ref(null)  
+onMounted(async () => {
+  try {
+    const data = await albumsService.getMine()
+    albums.value = data.map(a => ({
+      id:          a.id,
+      title:       a.name,
+      description: a.description,
+      privacy:     a.is_public ? 'Público' : 'Privado',
+      images:      a.image_count ?? 0,
+      quarantined: 0,
+      status:      stateToKey[a.state] ?? 'pending',
+      date:        new Date(a.date_created).toLocaleDateString('es-EC'),
+    }))
+  } catch {
+    albums.value = []
+  } finally {
+    loading.value = false
+  }
+})
 
 const filteredAlbums = computed(() => {
   let list = albums.value
@@ -46,9 +63,7 @@ function selectRow(album) {
   selected.value = selected.value?.id === album.id ? null : album
 }
 
-function closePreview() {
-  selected.value = null
-}
+function closePreview() { selected.value = null }
 </script>
 
 <template>

@@ -1,9 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AuthBrandPanel from '../components/AuthBrandPanel.vue'
+import { api, ApiError } from '../services/api'
+import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
+const { setToken, isAdmin } = useAuth()
 
 const email        = ref('')
 const password     = ref('')
@@ -34,10 +37,25 @@ async function handleLogin() {
   globalError.value = ''
   if (!validate()) return
   loading.value = true
-  // TODO: conectar al backend — por ahora redirige al dashboard demo
-  await new Promise(r => setTimeout(r, 800))
-  loading.value = false
-  router.push('/user/dashboard')
+  try {
+    const res = await api.post<{ access_token: string; token_type: string }>(
+      '/auth/login',
+      { email: email.value, password: password.value }
+    )
+    setToken(res.access_token)
+    router.push(isAdmin.value ? '/supervisor/dashboard' : '/user/dashboard')
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      globalError.value = 'Email o contraseña incorrectos'
+      fieldErrors.value.password = 'Contraseña incorrecta'
+    } else if (err instanceof ApiError && err.status === 429) {
+      globalError.value = 'Demasiados intentos. Espera un momento.'
+    } else {
+      globalError.value = 'Error de conexión. Intenta de nuevo.'
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -54,8 +72,7 @@ async function handleLogin() {
 
         <div v-if="globalError" class="alert alert--error" role="alert">
           <span class="alert__icon">⚠</span>
-          {{ globalError }} ·
-          <RouterLink to="/forgot-password" class="alert__link">recuperar</RouterLink>
+          {{ globalError }}
         </div>
 
         <div class="field" :class="{ 'field--error': fieldErrors.email, 'field--valid': !fieldErrors.email && email }">
@@ -98,7 +115,7 @@ async function handleLogin() {
               {{ showPassword ? '🙈' : '👁' }}
             </button>
           </div>
-          <p v-if="fieldErrors.password" class="field__error">⚠ {{ fieldErrors.password }}</p>
+          <p v-if="fieldErrors.password" class="field__error">{{ fieldErrors.password }}</p>
         </div>
 
         <div class="form-row">
@@ -106,7 +123,7 @@ async function handleLogin() {
             <input v-model="rememberMe" type="checkbox" class="checkbox" />
             Recordarme
           </label>
-          <RouterLink to="/forgot-password" class="link-muted">¿Olvidaste tu contraseña?</RouterLink>
+          <span class="link-muted link-muted--disabled">¿Olvidaste tu contraseña?</span>
         </div>
 
         <button type="submit" class="btn btn--primary" :disabled="loading">
@@ -117,7 +134,7 @@ async function handleLogin() {
         <div class="divider"><span>o</span></div>
 
         <button type="button" class="btn btn--outline" disabled title="Próximamente">
-          🔒 &nbsp;Continuar con Google
+          &nbsp;Continuar con Google
         </button>
 
         <p class="form-footer">
@@ -125,7 +142,6 @@ async function handleLogin() {
           <RouterLink to="/register" class="link-primary">Regístrate gratis</RouterLink>
         </p>
 
-        <!-- Demo rápido -->
         <div class="demo-section">
           <p class="demo-label">Acceso demo por rol</p>
           <div class="demo-btns">
@@ -319,6 +335,7 @@ async function handleLogin() {
 }
 
 .link-muted:hover { text-decoration: underline; }
+.link-muted--disabled { cursor: default; opacity: 0.5; pointer-events: none; }
 
 .link-primary {
   color: #2E75B6;
@@ -410,7 +427,6 @@ async function handleLogin() {
   margin: 0;
 }
 
-/* ── Demo section ── */
 .demo-section {
   border-top: 1px dashed #E5E7EB;
   padding-top: 1rem;

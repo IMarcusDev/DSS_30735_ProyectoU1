@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { useAuth } from '../composables/useAuth'
+import { albumsService } from '../services/albums'
+import { imagesService } from '../services/images'
 
 const route  = useRoute()
 const router = useRouter()
 const mobileOpen = ref(false)
 
-const user = { name: 'Geovanny Cudco', initials: 'GC', role: 'Supervisor' }
+const { user, fetchMe, logout: authLogout } = useAuth()
+
+const counts = ref({ pending: 0, quarantine: 0 })
+
+onMounted(async () => {
+  await fetchMe()
+  try {
+    const [albums, imgs] = await Promise.all([
+      albumsService.getPending(),
+      imagesService.getSuspicious(),
+    ])
+    counts.value = { pending: albums.length, quarantine: imgs.length }
+  } catch {}
+})
 
 const icons = {
   home:    'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
@@ -20,39 +36,37 @@ const icons = {
   bell:    'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
   menu:    'M4 6h16M4 12h16M4 18h16',
   chart:   'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  clock:   'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
 }
 
-const navGroups = [
+const navGroups = computed(() => [
   {
     label: 'SOLICITUDES',
     items: [
-      { label: 'Álbumes pendientes', to: '/supervisor/solicitudes',  icon: 'inbox',  badge: 3 },
-      { label: 'Aprobadas',          to: '/supervisor/aprobadas',    icon: 'check',  badge: null },
-      { label: 'Rechazadas',         to: '/supervisor/rechazadas',   icon: 'xcirc', badge: null },
+      { label: 'Álbumes pendientes', to: '/supervisor/solicitudes', icon: 'inbox', badge: counts.value.pending || null },
     ],
   },
   {
     label: 'CUARENTENA',
     items: [
-      { label: 'Por revisar',  to: '/supervisor/cuarentena',          icon: 'shield', badge: 5 },
-      { label: 'Liberadas',    to: '/supervisor/cuarentena-aprobadas',icon: 'check',  badge: null },
-      { label: 'Eliminadas',   to: '/supervisor/cuarentena-rechazadas',icon: 'xcirc',badge: null },
+      { label: 'Por revisar', to: '/supervisor/cuarentena', icon: 'shield', badge: counts.value.quarantine || null },
     ],
   },
   {
     label: 'SISTEMA',
     items: [
       { label: 'Dashboard', to: '/supervisor/dashboard', icon: 'chart', badge: null },
-      { label: 'Usuarios',  to: '/supervisor/usuarios',  icon: 'users', badge: null },
+      { label: 'Historial', to: '/supervisor/historial', icon: 'clock', badge: null },
     ],
   },
-]
+])
 
 const pageTitle = computed(() => {
   const map = {
     SuperDashboard:      'Dashboard',
     SolicitudesAlbumes:  'Solicitudes de Álbumes',
     Cuarentena:          'Bandeja de Cuarentena',
+    Historial:           'Historial de Actividad',
   }
   return (map as Record<string, string>)[route.name as string] || 'Panel de Supervisor'
 })
@@ -62,6 +76,7 @@ function isActive(to: string) {
 }
 
 function logout() {
+  authLogout()
   router.push('/login')
 }
 </script>
@@ -139,10 +154,10 @@ function logout() {
           </button>
 
           <div class="user-chip">
-            <div class="user-avatar">{{ user.initials }}</div>
+            <div class="user-avatar">AD</div>
             <div class="user-info">
-              <span class="user-name">{{ user.name }}</span>
-              <span class="user-role">{{ user.role }}</span>
+              <span class="user-name">Administrador</span>
+              <span class="user-role">{{ user?.role ?? 'Supervisor' }}</span>
             </div>
           </div>
         </div>
