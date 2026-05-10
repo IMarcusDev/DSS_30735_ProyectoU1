@@ -1,10 +1,11 @@
 <template>
   <div class="brand-panel">
     <div class="brand-header">
-      <img src="/logo.png" alt="SecureFrame" />
-      <span class="brand-name">Secureframe</span>
+      <router-link to="/" class="brand-link">
+        <img src="/logo.png" alt="SecureFrame" />
+        <span class="brand-name">Secureframe</span>
+      </router-link>
     </div>
-
     <div class="brand-body">
       <p class="brand-tag">SEGURIDAD EN CADA PÍXEL</p>
       <h1 class="brand-heading">
@@ -48,6 +49,14 @@
   align-items: center;
   gap: 0.65rem;
   z-index: 1;
+}
+
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+  color: inherit;
 }
 
 .brand-header img {

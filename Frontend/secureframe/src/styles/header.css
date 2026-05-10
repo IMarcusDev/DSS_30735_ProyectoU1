@@ -21,7 +21,7 @@ header {
     z-index: 100;
 }
 
-header > div:first-child {
+.logo {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -29,6 +29,13 @@ header > div:first-child {
     flex-shrink: 0;
     text-decoration: none;
     color: inherit;
+}
+
+header > div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
 }
 
 header img {
@@ -55,14 +62,6 @@ header h3 {
     opacity: 0.85;
     letter-spacing: 0.01em;
     flex: 1;
-}
-
-header > div:last-child {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.75rem;
-    flex-shrink: 0;
 }
 
 header button {
@@ -116,10 +115,6 @@ header button:active {
 
     header h3 {
         display: none;
-    }
-
-    header > div:last-child {
-        gap: 0.5rem;
     }
 
     header button {

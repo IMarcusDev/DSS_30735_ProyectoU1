@@ -149,14 +149,6 @@ async function handleLogin() {
               <span class="demo-dot demo-dot--visitor"></span>
               Visitante
             </RouterLink>
-            <RouterLink to="/user/dashboard" class="demo-btn demo-btn--user">
-              <span class="demo-dot demo-dot--user"></span>
-              Usuario
-            </RouterLink>
-            <RouterLink to="/supervisor/dashboard" class="demo-btn demo-btn--supervisor">
-              <span class="demo-dot demo-dot--supervisor"></span>
-              Supervisor
-            </RouterLink>
           </div>
         </div>
 
@@ -444,7 +436,7 @@ async function handleLogin() {
 
 .demo-btns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(1, 1fr);
   gap: 0.5rem;
 }
 

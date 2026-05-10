@@ -7,10 +7,10 @@ const router = useRouter()
 
 <template>
     <header>
-        <div>
+        <router-link to="/" class="logo">
             <img src="/logo.png" alt="logo de SecureFrames Gallery">
             <h1>SecureFrame Gallery</h1>
-        </div>
+        </router-link>
         <h3>Somos una aplicación de galería para almacenar imagenes de manera segura</h3>
         <div>
             <button type="button" @click="router.push('/login')">Iniciar Sesión</button>

@@ -28,9 +28,11 @@ def getAlbumById(album_id: str):
     with conn.cursor() as cur:
       cur.execute(
         """
-        SELECT album_id, album_name, album_description, album_is_public, album_date_created, album_state
-        FROM albums
-        WHERE album_id = %s
+        SELECT a.album_id, a.album_name, a.album_description, a.album_is_public,
+               a.album_date_created, a.album_state, u.user_name
+        FROM albums a
+        JOIN users u ON a.user_id = u.user_id
+        WHERE a.album_id = %s
         """,
         (album_id,),
       )
@@ -39,14 +41,17 @@ def getAlbumById(album_id: str):
   if not row:
     raise HTTPException(status_code=404, detail="Álbum no encontrado")
 
-  return Album(
-    id=row[0],
-    name=row[1],
-    description=row[2],
-    is_public=row[3],
-    date_created=row[4],
-    state=ALBUM_STATES(row[5]),
-  ).to_dict()
+  return {
+    **Album(
+      id=row[0],
+      name=row[1],
+      description=row[2],
+      is_public=row[3],
+      date_created=row[4],
+      state=ALBUM_STATES(row[5]),
+    ).to_dict(),
+    "author_name": row[6],
+  }
 
 
 @router.get('/')

@@ -41,7 +41,7 @@ export function useAuth() {
       const me = await api.get<AuthUser>('/auth/me')
       user.value = me
     } catch {
-      // Token expired or invalid — cleared by api.ts
+      // Token expired or invalid managed for api.ts
     }
   }
 
