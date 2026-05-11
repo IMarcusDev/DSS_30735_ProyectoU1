@@ -152,12 +152,6 @@ function logout() {
         </div>
 
         <div class="topbar-right">
-          <button class="topbar-btn" aria-label="Notificaciones">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path :d="icons.bell" />
-            </svg>
-            <span class="topbar-btn-dot"></span>
-          </button>
 
           <div class="user-chip">
             <div class="user-avatar">{{ displayInitials }}</div>

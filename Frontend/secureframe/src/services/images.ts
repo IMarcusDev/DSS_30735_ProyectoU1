@@ -1,12 +1,17 @@
 import { api } from './api'
 
+export interface ImageAnalysisDetails {
+  mime:      { valid: boolean; mime: string }
+  exif:      { exif: Record<string, string>; gps: Record<string, string>; risks: string[] }
+  eof:       { suspicious: boolean; extra_bytes?: number; reason?: string }
+  histogram: { variance: number; suspicious: boolean }
+  lsb:       { lsb_ratio: number; suspicious: boolean }
+}
+
 export interface ImageAnalysis {
-  mime_valid?:          boolean
-  exif_suspicious?:     boolean
-  eof_suspicious?:      boolean
-  histogram_suspicious?: boolean
-  lsb_suspicious?:      boolean
-  [key: string]: unknown
+  suspicious: boolean
+  risks:      string[]
+  details:    ImageAnalysisDetails
 }
 
 export interface GalleryImage {
@@ -44,11 +49,17 @@ export const imagesService = {
 
 export function getAnalysisReasons(analysis: ImageAnalysis | null): string[] {
   if (!analysis) return []
+
+  // The backend already computes a human-readable risks array — use it directly
+  if (analysis.risks.length > 0) return analysis.risks
+
+  // Fallback: derive from details sub-fields
   const reasons: string[] = []
-  if (analysis.lsb_suspicious)       reasons.push('Anomalía LSB detectada')
-  if (analysis.eof_suspicious)       reasons.push('Marcador EOF sospechoso')
-  if (analysis.histogram_suspicious) reasons.push('Histograma de color anómalo')
-  if (analysis.exif_suspicious)      reasons.push('Metadatos EXIF sospechosos')
-  if (!analysis.mime_valid)          reasons.push('Tipo MIME inválido')
+  if (!analysis.details.mime.valid)           reasons.push(`MIME inválido: ${analysis.details.mime.mime}`)
+  if (analysis.details.exif.risks.length)     reasons.push(...analysis.details.exif.risks)
+  if (analysis.details.eof.suspicious)        reasons.push(analysis.details.eof.reason ?? 'Marcador EOF sospechoso')
+  if (analysis.details.histogram.suspicious)  reasons.push(`Histograma anómalo (varianza ${analysis.details.histogram.variance.toFixed(0)})`)
+  if (analysis.details.lsb.suspicious)        reasons.push(`LSB anómalo (ratio ${analysis.details.lsb.lsb_ratio.toFixed(4)})`)
+
   return reasons.length ? reasons : ['Contenido sospechoso detectado']
 }
