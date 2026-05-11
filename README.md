@@ -267,7 +267,7 @@ Las imágenes válidas terminan con marcadores bien definidos (JPEG: `\xFF\xD9`,
 
 - [x] Código fuente de la aplicación web
 - [x] Repositorio público en GitHub con historial de commits completo
-- [ ] Documento de Plan Estratégico de Seguridad (PDF, máx. 10 páginas)
+- [x] Documento de Plan Estratégico de Seguridad (PDF, máx. 10 páginas)
 - [x] Aplicación desplegada y funcional al momento de la entrega
 
 **Fecha límite de entrega:** 12 de mayo de 2026, 11:00  
