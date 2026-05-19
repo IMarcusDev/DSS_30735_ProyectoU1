@@ -8,4 +8,4 @@ def insert_test_comment(image_path: str, comment: str = "Este es un comentario d
   exif_bytes = piexif.dump(exif_dict)
   piexif.insert(exif_bytes, image_path)
 
-insert_test_comment("test.jpeg", "Comentario de Prueba")
+insert_test_comment("test/test.jpeg", "I Love Linux")
